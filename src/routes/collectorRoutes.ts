@@ -1,9 +1,12 @@
 import { Router } from "express";
-import { auth, requireRole } from "../middleware/authMiddleware";
-import { todaysAssignments, scan, syncBatch } from "../controllers/collectorController";
+import { auth, requireCollector, requireAdmin } from "../middleware/authMiddleware.js";
+import { todaysAssignments, scan, syncBatch } from "../controllers/collectorController.js";
 
 const router = Router();
-router.get("/assignments/today", auth, requireRole("COLLECTOR", "ADMIN"), todaysAssignments);
-router.post("/scan", auth, requireRole("COLLECTOR", "ADMIN"), scan);
-router.post("/sync", auth, requireRole("COLLECTOR", "ADMIN"), syncBatch);
+
+// Collector routes
+router.get("/assignments/today", auth, requireCollector, todaysAssignments);
+router.post("/scan", auth, requireCollector, scan);
+router.post("/sync", auth, requireCollector, syncBatch);
+
 export default router;
