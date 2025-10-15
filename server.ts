@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import connectDB from "./src/config/db.js";
-
+import binRoutes from "./src/routes/binRoute";
 import authRoutes from "./src/routes/authRoutes.js";
 import requestRoutes from "./src/routes/requestRoutes.js";
 import routeRoutes from "./src/routes/routeRoutes.js";
@@ -34,6 +34,7 @@ app.use("/api/requests", requestRoutes);
 app.use("/api/routes", routeRoutes);
 app.use("/api/collector", collectorRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/bins", binRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => 

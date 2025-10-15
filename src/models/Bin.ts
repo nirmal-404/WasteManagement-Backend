@@ -1,40 +1,47 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Schema } from "mongoose";
 
-const binSchema = new mongoose.Schema(
+export interface IBin extends Document {
+  wasteType: "Organic" | "Plastic" | "Metal" | "Paper" | "Glass" | "Other";
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  locationName: string;
+  status: "Ready" | "Collected" | "Pending" | "Canceled";
+  userId: mongoose.Types.ObjectId;
+  fillLevel?: number;
+  weight?: number;
+}
+
+const binSchema = new Schema<IBin>(
   {
-    binId: { 
-      type: String, 
-      required: true, 
-      unique: true 
-    },
-    type: { 
-      type: String, 
-      enum: ["Organic", "Plastic", "Metal", "Paper", "Glass"], 
-      required: true 
-    },
-    ownerUserId: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: "User" 
+    wasteType: {
+      type: String,
+      enum: ["Organic", "Plastic", "Metal", "Paper", "Glass", "Other"],
+      required: true,
     },
     location: {
-      type : String,
-      required: true
+      latitude: { type: Number, required: true },
+      longitude: { type: Number, required: true },
     },
-    fillLevel: { 
-      type: Number, 
-      min: 0, 
-      max: 5, 
-      default: 0 
+    locationName: {
+      type: String,
+      required: true,
     },
-    status: { 
-      type: String, 
-      enum: ["Ready", "Collected", "Pending"], 
-      default: "Ready" 
+    status: {
+      type: String,
+      enum: ["Ready", "Collected", "Pending", "Canceled"],
+      default: "Pending",
     },
-    lastCollectedAt: Date
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    fillLevel: { type: Number, default: 0 },
+    weight: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Bin", binSchema);
 
+binSchema.index({ userId: 1, locationName: 1, wasteType: 1 }, { unique: true });
+
+const Bin = mongoose.model<IBin>("Bin", binSchema);
+export default Bin;
