@@ -1,39 +1,22 @@
-import mongoose from 'mongoose'
+import { Schema, model, Document, Types } from "mongoose";
 
-const detailSchema = new mongoose.Schema(
-  {
-    binId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Bin'
-    },
-    type: String,
-    collectedAt: Date,
-    weightKg: Number
-  },
-  { _id: false }
-)
+export interface IWasteRecord extends Document {
+  recordId: string;
+  userId: Types.ObjectId;
+  totalAmount: number;
+  description?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
-const wasteRecordSchema = new mongoose.Schema(
+const wasteRecordSchema = new Schema<IWasteRecord>(
   {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    month: {
-      type: String,
-      required: true
-    }, // e.g., "2025-10"
-    details: [detailSchema],
-    specialFees: {
-      type: Number,
-      default: 0
-    },
-    fines: {
-      type: Number,
-      default: 0
-    }
+    recordId: { type: String, required: true, unique: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    totalAmount: { type: Number, required: true },
+    description: { type: String },
   },
   { timestamps: true }
-)
+);
 
-export default mongoose.model('WasteRecord', wasteRecordSchema)
+export const WasteRecord = model<IWasteRecord>("WasteRecord", wasteRecordSchema);

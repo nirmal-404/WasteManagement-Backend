@@ -1,29 +1,12 @@
 import { Router } from "express";
-import { auth, requireAdmin, requireCollector } from "../middleware/authMiddleware.js";
-import { 
-  generateRoutes,
-  createRoute,
-  listRoutes,
-  getRouteById,
-  updateRouteStatus,
-  updateCollectionStatus,
-  assignRoute,
-  deleteRoute,
-  createRouteValidation
-} from "../controllers/routeController.js";
+import { RouteController } from "../controllers/routeController";
 
 const router = Router();
 
-// Admin routes
-router.post("/generate", auth, requireAdmin, generateRoutes);
-router.post("/", auth, requireAdmin, createRouteValidation, createRoute);
-router.get("/", auth, requireAdmin, listRoutes);
-router.get("/:id", auth, getRouteById);
-router.patch("/:id/status", auth, requireAdmin, updateRouteStatus);
-router.patch("/:id/assign", auth, requireAdmin, assignRoute);
-router.delete("/:id", auth, requireAdmin, deleteRoute);
-
-// Collector/Driver routes
-router.patch("/:id/collection", auth, requireCollector, updateCollectionStatus);
+router.post("/", RouteController.createRoute);
+router.get("/", RouteController.getAllRoutes);
+router.get("/:id", RouteController.getRouteById);
+router.put("/:id", RouteController.updateRoute);
+router.delete("/:id", RouteController.deleteRoute);
 
 export default router;
