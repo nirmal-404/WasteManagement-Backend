@@ -14,23 +14,14 @@ const requestSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['NORMAL', 'SPECIAL_EQUIPPED', 'HAZARDOUS', 'BULKY_ITEMS', 'ELECTRONIC_WASTE'],
+      enum: ['NORMAL', 'SPECIAL_EQUIPPED'],
       default: 'NORMAL'
-    },
-    category: {
-      type: String,
-      enum: ['HOUSEHOLD', 'GARDEN', 'CONSTRUCTION', 'MEDICAL', 'ELECTRONIC'],
-      required: true
     },
     description: {
       type: String,
       required: true
     },
     remarks: String,
-    location: {
-      type: String,
-      required: true
-    },
     address: {
       type: String,
       required: true
@@ -44,7 +35,7 @@ const requestSchema = new mongoose.Schema(
     urgency: {
       type: String,
       enum: ['LOW', 'MEDIUM', 'HIGH'],
-      default: 'MEDIUM'
+      default: 'LOW'
     },
     estimatedWeight: Number, // in kg
     estimatedVolume: Number, // in cubic meters

@@ -12,10 +12,7 @@ interface AuthenticatedRequest extends Request {
 // Fee configuration
 const FEE_CONFIG = {
   NORMAL: 800,
-  SPECIAL_EQUIPPED: 1300,
-  HAZARDOUS: 2000,
-  BULKY_ITEMS: 1500,
-  ELECTRONIC_WASTE: 1800
+  SPECIAL_EQUIPPED: 1300
 };
 
 const WEIGHT_FEE_PER_KG = 50;
@@ -27,8 +24,7 @@ const URGENCY_FEE = {
 
 // Validation middleware
 export const createRequestValidation = [
-  body('type').isIn(['NORMAL', 'SPECIAL_EQUIPPED', 'HAZARDOUS', 'BULKY_ITEMS', 'ELECTRONIC_WASTE']).withMessage('Invalid request type'),
-  body('category').isIn(['HOUSEHOLD', 'GARDEN', 'CONSTRUCTION', 'MEDICAL', 'ELECTRONIC']).withMessage('Invalid category'),
+  body('type').isIn(['NORMAL', 'SPECIAL_EQUIPPED']).withMessage('Invalid request type'),
   body('description').notEmpty().withMessage('Description is required'),
   body('address').notEmpty().withMessage('Address is required'),
   body('preferredDate').optional().isISO8601().withMessage('Invalid date format'),
@@ -42,7 +38,13 @@ export const scheduleRequestValidation = [
 ];
 
 // Calculate fee based on request details
-const calculateFee = (requestData: any) => {
+interface RequestData {
+  type: 'NORMAL' | 'SPECIAL_EQUIPPED';
+  urgency: 'LOW' | 'MEDIUM' | 'HIGH';
+  estimatedWeight?: number;
+}
+
+const calculateFee = (requestData: RequestData) => {
   let baseFee = FEE_CONFIG[requestData.type] || FEE_CONFIG.NORMAL;
   let weightFee = 0;
   let urgencyFee = URGENCY_FEE[requestData.urgency] || 0;
@@ -50,15 +52,12 @@ const calculateFee = (requestData: any) => {
   if (requestData.estimatedWeight) {
     weightFee = requestData.estimatedWeight * WEIGHT_FEE_PER_KG;
   }
-  
-  const specialHandlingFee = requestData.type === 'HAZARDOUS' ? 500 : 0;
-  
+ 
   return {
     baseFee,
     weightFee,
-    specialHandlingFee,
     urgencyFee,
-    total: baseFee + weightFee + specialHandlingFee + urgencyFee
+    total: baseFee + weightFee + urgencyFee
   };
 };
 
@@ -85,14 +84,12 @@ export const createRequest = async (req: AuthenticatedRequest, res: Response) =>
       requestId,
       userId: req.user._id,
       type: requestData.type,
-      category: requestData.category,
       description: requestData.description,
       remarks: requestData.remarks,
-      location: requestData.location,
       address: requestData.address,
       preferredDate: requestData.preferredDate ? new Date(requestData.preferredDate) : null,
       preferredTimeSlot: requestData.preferredTimeSlot || 'MORNING',
-      urgency: requestData.urgency || 'MEDIUM',
+      urgency: requestData.urgency || 'LOW',
       estimatedWeight: requestData.estimatedWeight,
       estimatedVolume: requestData.estimatedVolume,
       fee: feeBreakdown.total,
