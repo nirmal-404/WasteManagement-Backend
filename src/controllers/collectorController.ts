@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Route from "../models/Route.js";
 import Bin from "../models/Bin.js";
+import RequestModel from "../models/Request.js";
 
 interface AuthenticatedRequest extends Request {
   user?: any;
@@ -41,6 +42,42 @@ export const todaysAssignments = async (req: AuthenticatedRequest, res: Response
   }
 };
 
+interface AuthenticatedRequest extends Request {
+  user?: any;
+}
+
+export const todaysCollectorRequests = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 1);
+
+    const query = {
+      "assigned.collectors": req.user._id,
+      scheduledAt: { $gte: start, $lt: end },
+      status: { $in: ["SCHEDULED", "IN_PROGRESS"] }
+    };
+
+    const requests = await RequestModel.find(query)
+      .populate("userId", "name email phone address")
+      .populate("assigned.driverId", "name phone")
+      .populate("assigned.vehicleId", "plateNo capacityKg")
+      .populate("assigned.collectors", "name phone")
+      .populate("assigned.routeId", "routeName scheduledDate")
+      .sort({ scheduledAt: 1 });
+
+    res.json({ requests });
+  } catch (error: any) {
+    console.error("Get today's collector requests error:", error);
+    res.status(500).json({ message: error.message || "Failed to fetch today's requests" });
+  }
+};
+
 export const scan = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { binId, manualReason, weightKg, notes } = req.body;
@@ -53,7 +90,6 @@ export const scan = async (req: AuthenticatedRequest, res: Response) => {
     // Update bin status
     bin.status = "Collected";
     bin.fillLevel = 0;
-    bin.lastCollectedAt = new Date();
     await bin.save();
     
     res.json({ 
@@ -94,13 +130,11 @@ export const syncBatch = async (req: AuthenticatedRequest, res: Response) => {
         
         bin.status = "Collected";
         bin.fillLevel = 0;
-        bin.lastCollectedAt = item.collectedAt ? new Date(item.collectedAt) : new Date();
         await bin.save();
         
         results.push({ 
           binId: bin._id, 
           success: true,
-          collectedAt: bin.lastCollectedAt
         });
       } catch (itemError) {
         results.push({ 
@@ -124,3 +158,22 @@ export const syncBatch = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
+export const updateRouteStatus = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { status, actualStartTime, actualEndTime } = req.body;
+    
+    const route = await Route.findById(req.params.id);
+    if (!route) {
+      return res.status(404).json({ message: "Route not found" });
+    }
+    
+    route.status = status;
+    
+    await route.save();
+    
+    res.json({ message: "Route status updated successfully", route });
+  } catch (error: any) {
+    console.error('Update route status error:', error);
+    res.status(500).json({ message: error.message || "Failed to update route status" });
+  }
+};

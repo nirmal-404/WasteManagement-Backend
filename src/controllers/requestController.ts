@@ -4,6 +4,12 @@ import RequestModel from "../models/Request.js";
 import User from "../models/User.js";
 import Truck from "../models/Truck.js";
 import { v4 as uuidv4 } from 'uuid';
+import { 
+  notifyRequestApproved, 
+  notifyRequestRejected, 
+  notifyRequestScheduled,
+  notifyStatusUpdate 
+} from "../utils/notificationUtils.js";
 
 interface AuthenticatedRequest extends Request {
   user?: any;
@@ -202,25 +208,36 @@ export const getRequestById = async (req: AuthenticatedRequest, res: Response) =
   }
 };
 
+//Approve Request
 export const approveRequest = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const { adminNotes, sendNotification } = req.body;
+
     const request = await RequestModel.findById(req.params.id);
-    
     if (!request) {
       return res.status(404).json({ message: "Request not found" });
     }
-    
+
     if (request.status !== 'PENDING') {
-      return res.status(400).json({ message: "Request is not pending" });
+      return res.status(400).json({ message: "Only pending requests can be approved" });
     }
-    
+
     request.status = 'APPROVED';
-    request.adminNotes = req.body.adminNotes || '';
+    if (adminNotes) request.adminNotes = adminNotes;
     await request.save();
-    
-    res.json({
+
+    // Send notification to user
+    if (sendNotification) {
+      await notifyRequestApproved(
+        request.userId.toString(),
+        request._id.toString(),
+        request.requestId
+      );
+    }
+
+    res.json({ 
       message: "Request approved successfully",
-      request: await RequestModel.findById(request._id).populate('userId', 'name email')
+      request 
     });
   } catch (error: any) {
     console.error('Approve request error:', error);
@@ -230,32 +247,42 @@ export const approveRequest = async (req: AuthenticatedRequest, res: Response) =
   }
 };
 
+// Reject request
 export const rejectRequest = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { rejectionReason } = req.body;
-    
+    const { rejectionReason, adminNotes, sendNotification } = req.body;
+
     if (!rejectionReason) {
       return res.status(400).json({ message: "Rejection reason is required" });
     }
-    
+
     const request = await RequestModel.findById(req.params.id);
-    
     if (!request) {
       return res.status(404).json({ message: "Request not found" });
     }
-    
-    if (request.status !== 'PENDING') {
-      return res.status(400).json({ message: "Request is not pending" });
+
+    if (request.status !== 'PENDING' && request.status !== 'APPROVED') {
+      return res.status(400).json({ message: "Only pending or approved requests can be rejected" });
     }
-    
+
     request.status = 'REJECTED';
     request.rejectionReason = rejectionReason;
-    request.adminNotes = req.body.adminNotes || '';
+    if (adminNotes) request.adminNotes = adminNotes;
     await request.save();
-    
-    res.json({
+
+    // Send notification to user
+    if (sendNotification !== false) {
+      await notifyRequestRejected(
+        request.userId.toString(),
+        request._id.toString(),
+        request.requestId,
+        rejectionReason
+      );
+    }
+
+    res.json({ 
       message: "Request rejected successfully",
-      request: await RequestModel.findById(request._id).populate('userId', 'name email')
+      request 
     });
   } catch (error: any) {
     console.error('Reject request error:', error);
@@ -265,58 +292,72 @@ export const rejectRequest = async (req: AuthenticatedRequest, res: Response) =>
   }
 };
 
+// Schedule request
 export const scheduleRequest = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    // Check validation errors
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        message: "Validation failed", 
-        errors: errors.array() 
-      });
-    }
-
-    const { scheduledAt, driverId, vehicleId, collectors = [], equipment = [] } = req.body;
-    
-    const request = await RequestModel.findById(req.params.id);
-    
-    if (!request) {
-      return res.status(404).json({ message: "Request not found" });
-    }
-    
-    if (request.status !== 'APPROVED') {
-      return res.status(400).json({ message: "Request must be approved before scheduling" });
-    }
-    
-    // Verify driver and vehicle exist
-    const driver = await User.findById(driverId);
-    if (!driver || driver.role !== 'DRIVER') {
-      return res.status(400).json({ message: "Invalid driver" });
-    }
-    
-    const vehicle = await Truck.findById(vehicleId);
-    if (!vehicle) {
-      return res.status(400).json({ message: "Invalid vehicle" });
-    }
-    
-    // Update request
-    request.scheduledAt = new Date(scheduledAt);
-    request.assigned = { 
+    const { 
+      scheduledAt, 
       driverId, 
       vehicleId, 
       collectors, 
-      equipment 
-    };
+      equipment, 
+      adminNotes,
+      sendNotification 
+    } = req.body;
+
+    if (!scheduledAt || !driverId || !vehicleId) {
+      return res.status(400).json({ 
+        message: "Scheduled date/time, driver, and vehicle are required" 
+      });
+    }
+
+    const request = await RequestModel.findById(req.params.id)
+      .populate('userId', 'name email phone');
+      
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    if (request.status !== 'APPROVED') {
+      return res.status(400).json({ message: "Only approved requests can be scheduled" });
+    }
+
     request.status = 'SCHEDULED';
-    request.adminNotes = req.body.adminNotes || '';
+    request.scheduledAt = new Date(scheduledAt);
+    request.assigned = {
+      driverId,
+      vehicleId,
+      collectors: collectors || [],
+      equipment: equipment || []
+    };
+    if (adminNotes) request.adminNotes = adminNotes;
+
     await request.save();
-    
-    res.json({
+
+    // Populate the assigned fields for response
+    await request.populate([
+      { path: 'assigned.driverId', select: 'name phone' },
+      { path: 'assigned.vehicleId', select: 'plateNo capacityKg' },
+      { path: 'assigned.collectors', select: 'name phone' }
+    ]);
+
+    // Send notification to user
+    if (sendNotification) {
+      const scheduledDate = new Date(scheduledAt).toLocaleString();
+      const driverName = (request.assigned.driverId as any)?.name;
+      
+      await notifyRequestScheduled(
+        request.userId._id.toString(),
+        request._id.toString(),
+        request.requestId,
+        scheduledDate,
+        driverName
+      );
+    }
+
+    res.json({ 
       message: "Request scheduled successfully",
-      request: await RequestModel.findById(request._id)
-        .populate('userId', 'name email phone')
-        .populate('assigned.driverId', 'name phone')
-        .populate('assigned.vehicleId', 'plateNo')
+      request 
     });
   } catch (error: any) {
     console.error('Schedule request error:', error);
@@ -326,32 +367,38 @@ export const scheduleRequest = async (req: AuthenticatedRequest, res: Response) 
   }
 };
 
+// Update request status (for collectors/drivers)
 export const updateRequestStatus = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { status } = req.body;
-    const validStatuses = ['IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
-    
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ message: "Invalid status" });
+
+    if (!['IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(status)) {
+      return res.status(400).json({ 
+        message: "Invalid status. Allowed: IN_PROGRESS, COMPLETED, CANCELLED" 
+      });
     }
-    
-    const request = await RequestModel.findById(req.params.id);
-    
+
+    const request = await RequestModel.findById(req.params.id)
+      .populate('userId', 'name email phone');
+      
     if (!request) {
       return res.status(404).json({ message: "Request not found" });
     }
-    
+
     request.status = status;
-    
-    if (status === 'COMPLETED') {
-      request.completedAt = new Date();
-    }
-    
     await request.save();
-    
-    res.json({
-      message: `Request ${status.toLowerCase()} successfully`,
-      request: await RequestModel.findById(request._id).populate('userId', 'name email')
+
+    // Send notification to user based on status
+    await notifyStatusUpdate(
+      request.userId._id.toString(),
+      request._id.toString(),
+      request.requestId,
+      status
+    );
+
+    res.json({ 
+      message: "Request status updated successfully",
+      request 
     });
   } catch (error: any) {
     console.error('Update request status error:', error);

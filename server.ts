@@ -9,6 +9,8 @@ import requestRoutes from "./src/routes/requestRoutes.js";
 import routeRoutes from "./src/routes/routeRoutes.js";
 import collectorRoutes from "./src/routes/collectorRoutes.js";
 import paymentRoutes from "./src/routes/paymentRoutes.js";
+import truckRoutes from "./src/routes/truckRoutes.js";
+import userRoutes from "./src/routes/userRoutes.js";
 
 dotenv.config();
 
@@ -35,6 +37,8 @@ app.use("/api/routes", routeRoutes);
 app.use("/api/collector", collectorRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/bins", binRoutes);
+app.use("/api/trucks", truckRoutes);
+app.use("/api/users", userRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => 
