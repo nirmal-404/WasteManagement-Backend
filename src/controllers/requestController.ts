@@ -214,7 +214,7 @@ export const getRequestById = async (req: AuthenticatedRequest, res: Response) =
 //Approve Request
 export const approveRequest = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { adminNotes, sendNotification } = req.body;
+    const { adminNotes } = req.body;
 
     const request = await RequestModel.findById(req.params.id);
     if (!request) {
@@ -229,14 +229,12 @@ export const approveRequest = async (req: AuthenticatedRequest, res: Response) =
     if (adminNotes) request.adminNotes = adminNotes;
     await request.save();
 
-    // Send notification to user
-    if (sendNotification) {
-      await notifyRequestApproved(
-        request.userId.toString(),
-        request._id.toString(),
-        request.requestId
-      );
-    }
+    // Send notification to user (always)
+    await notifyRequestApproved(
+      request.userId.toString(),
+      request._id.toString(),
+      request.requestId
+    );
 
     // Auto-create WasteRecord and PaymentBill
     try {
@@ -297,7 +295,7 @@ export const approveRequest = async (req: AuthenticatedRequest, res: Response) =
 // Reject request
 export const rejectRequest = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { rejectionReason, adminNotes, sendNotification } = req.body;
+    const { rejectionReason, adminNotes } = req.body;
 
     if (!rejectionReason) {
       return res.status(400).json({ message: "Rejection reason is required" });
@@ -317,15 +315,13 @@ export const rejectRequest = async (req: AuthenticatedRequest, res: Response) =>
     if (adminNotes) request.adminNotes = adminNotes;
     await request.save();
 
-    // Send notification to user
-    if (sendNotification !== false) {
-      await notifyRequestRejected(
-        request.userId.toString(),
-        request._id.toString(),
-        request.requestId,
-        rejectionReason
-      );
-    }
+    // Send notification to user (always)
+    await notifyRequestRejected(
+      request.userId.toString(),
+      request._id.toString(),
+      request.requestId,
+      rejectionReason
+    );
 
     res.json({ 
       message: "Request rejected successfully",

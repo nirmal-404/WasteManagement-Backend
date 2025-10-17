@@ -11,7 +11,8 @@ import routeRoutes from "./src/routes/routeRoutes.js";
 import collectorRoutes from "./src/routes/collectorRoutes.js";
 import paymentBillRoutes from "./src/routes/paymentBillRoutes.js";
 import truckRoutes from "./src/routes/truckRoutes.js";
-import userRoutes from "./src/routes/userRoutes.js";
+import userRoutes, { residentNotificationsRouter } from "./src/routes/userRoutes.js";
+import rewardRoutes from "./src/routes/rewardRoutes.js";
 
 dotenv.config();
 
@@ -41,6 +42,8 @@ app.use("/api/payment-bills", paymentBillRoutes);
 app.use("/api/bins", binRoutes);
 app.use("/api/trucks", truckRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/my/notifications", residentNotificationsRouter);
+app.use("/api/rewards", rewardRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => 
