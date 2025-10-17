@@ -10,6 +10,9 @@ import {
   notifyRequestScheduled,
   notifyStatusUpdate 
 } from "../utils/notificationUtils.js";
+import Bin from "../models/Bin.js";
+import { WasteRecord } from "../models/WasteRecord.js";
+import { PaymentBillModel } from "../models/PaymentBill.js";
 
 interface AuthenticatedRequest extends Request {
   user?: any;
@@ -211,7 +214,7 @@ export const getRequestById = async (req: AuthenticatedRequest, res: Response) =
 //Approve Request
 export const approveRequest = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { adminNotes, sendNotification } = req.body;
+    const { adminNotes } = req.body;
 
     const request = await RequestModel.findById(req.params.id);
     if (!request) {
@@ -226,19 +229,61 @@ export const approveRequest = async (req: AuthenticatedRequest, res: Response) =
     if (adminNotes) request.adminNotes = adminNotes;
     await request.save();
 
-    // Send notification to user
-    if (sendNotification) {
-      await notifyRequestApproved(
-        request.userId.toString(),
-        request._id.toString(),
-        request.requestId
-      );
-    }
+    // Send notification to user (always)
+    await notifyRequestApproved(
+      request.userId.toString(),
+      request._id.toString(),
+      request.requestId
+    );
 
-    res.json({ 
-      message: "Request approved successfully",
-      request 
-    });
+    // Auto-create WasteRecord and PaymentBill
+    try {
+      // Find user's bin if exists (take first bin by user)
+      const userBins = await Bin.find({ userId: request.userId }).sort({ createdAt: -1 }).limit(1);
+      const bin = userBins[0];
+
+      const recordId = `WR-${Date.now()}-${uuidv4().substring(0, 6).toUpperCase()}`;
+      const weight = request.estimatedWeight || 0;
+      const wasteType = (bin as any)?.wasteType || undefined;
+      const totalAmount = request.fee || 0;
+
+      const wasteRecord = await WasteRecord.create({
+        recordId,
+        userId: request.userId,
+        binId: bin?._id,
+        weight,
+        wasteType,
+        totalAmount,
+        description: request.description
+      });
+
+      const billId = `BILL-${Date.now()}-${uuidv4().substring(0, 6).toUpperCase()}`;
+      const discountAmount = 0;
+      const finalAmount = totalAmount - discountAmount;
+
+      const bill = await PaymentBillModel.create({
+        billId,
+        userId: request.userId,
+        wasteRecordId: wasteRecord._id,
+        totalAmount,
+        paidAmount: 0,
+        status: 'pending'
+      });
+
+      res.json({ 
+        message: "Request approved successfully",
+        request,
+        wasteRecord,
+        bill
+      });
+    } catch (autoError: any) {
+      console.error('Auto create WasteRecord/Bill error:', autoError);
+      // Still respond success for approval, but include warning
+      res.json({ 
+        message: "Request approved successfully (record/bill creation failed)",
+        request
+      });
+    }
   } catch (error: any) {
     console.error('Approve request error:', error);
     res.status(500).json({ 
@@ -250,7 +295,7 @@ export const approveRequest = async (req: AuthenticatedRequest, res: Response) =
 // Reject request
 export const rejectRequest = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { rejectionReason, adminNotes, sendNotification } = req.body;
+    const { rejectionReason, adminNotes } = req.body;
 
     if (!rejectionReason) {
       return res.status(400).json({ message: "Rejection reason is required" });
@@ -270,15 +315,13 @@ export const rejectRequest = async (req: AuthenticatedRequest, res: Response) =>
     if (adminNotes) request.adminNotes = adminNotes;
     await request.save();
 
-    // Send notification to user
-    if (sendNotification !== false) {
-      await notifyRequestRejected(
-        request.userId.toString(),
-        request._id.toString(),
-        request.requestId,
-        rejectionReason
-      );
-    }
+    // Send notification to user (always)
+    await notifyRequestRejected(
+      request.userId.toString(),
+      request._id.toString(),
+      request.requestId,
+      rejectionReason
+    );
 
     res.json({ 
       message: "Request rejected successfully",

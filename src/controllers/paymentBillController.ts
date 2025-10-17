@@ -1,4 +1,4 @@
-import { PaymentBillModel, IPaymentBill } from "../models/Payment";
+import { PaymentBillModel, IPaymentBill } from "../models/PaymentBill";
 import { Types } from "mongoose";
 
 export class PaymentBillController  {

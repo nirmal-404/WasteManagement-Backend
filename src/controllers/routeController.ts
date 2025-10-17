@@ -3,14 +3,18 @@ import Route from "../models/Route";
 import Bin from "../models/Bin";
 import mongoose from "mongoose";
 
-// Helper function: Euclidean distance (approx)
-const distance = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
+
+// Calculate approximate distance between two coordinates
+const distance = (
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number }
+) => {
   const dx = a.latitude - b.latitude;
   const dy = a.longitude - b.longitude;
   return Math.sqrt(dx * dx + dy * dy);
 };
 
-// Simple nearest neighbor algorithm
+// Simple nearest neighbor optimization
 const getOptimizedPath = (
   start: { latitude: number; longitude: number },
   bins: { latitude: number; longitude: number }[]
@@ -29,41 +33,59 @@ const getOptimizedPath = (
   return path;
 };
 
-// Generate Google Maps directions URL
+// Extract latitude/longitude from Google Maps URL
+function extractCoordinatesFromUrl(
+  url: string
+): { latitude: number; longitude: number } | null {
+  const regex =
+    /@(-?\d+\.\d+),(-?\d+\.\d+)|q=(-?\d+\.\d+),(-?\d+\.\d+)|place\/(-?\d+\.\d+),(-?\d+\.\d+)/;
+  const match = url.match(regex);
+
+  if (!match) return null;
+
+  const latStr = match[1] ?? match[3] ?? match[5];
+  const lngStr = match[2] ?? match[4] ?? match[6];
+
+  if (typeof latStr === "undefined" || typeof lngStr === "undefined") return null;
+
+  const lat = parseFloat(latStr);
+  const lng = parseFloat(lngStr);
+
+  if (isNaN(lat) || isNaN(lng)) return null;
+
+  return { latitude: lat, longitude: lng };
+}
+
+// Generate Google Maps route URL (multi-stop friendly)
 function generateDirectionsUrl(
   startLocation: { latitude: number; longitude: number } | undefined,
-  path: { latitude: number; longitude: number }[] | undefined
+  optimizedPath: { latitude: number; longitude: number }[] | undefined
 ): string {
-  if (!startLocation || !path || path.length === 0) return "";
+  if (!startLocation || !optimizedPath || optimizedPath.length === 0) return "";
 
-  const origin = `${startLocation.latitude},${startLocation.longitude}`;
-  const lastPoint = path[path.length - 1];
-  if (!lastPoint) return ""; // TypeScript-safe check
-
-  const destination = `${lastPoint.latitude},${lastPoint.longitude}`;
-  const waypoints =
-    path.length > 1
-      ? path.slice(0, -1).map(p => `${p.latitude},${p.longitude}`).join("|")
-      : "";
-
-  let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
-  if (waypoints) url += `&waypoints=${waypoints}`;
-
-  return url;
+  const waypoints = [startLocation, ...optimizedPath];
+  const coordinates = waypoints.map((p) => `${p.latitude},${p.longitude}`).join("/");
+  return `https://www.google.com/maps/dir/${coordinates}`;
 }
 
 
-// Create a new route
 export class RouteController {
+  // ✅ Create route using mapUrl
   static async createRoute(req: Request, res: Response): Promise<void> {
     try {
-      const { routeName, startLocation } = req.body as {
+      const { routeName, mapUrl } = req.body as {
         routeName?: string;
-        startLocation: { latitude: number; longitude: number };
+        mapUrl: string;
       };
 
+      if (!mapUrl) {
+        res.status(400).json({ message: "mapUrl is required" });
+        return;
+      }
+
+      const startLocation = extractCoordinatesFromUrl(mapUrl);
       if (!startLocation) {
-        res.status(400).json({ message: "startLocation is required" });
+        res.status(400).json({ message: "Invalid Google Maps URL" });
         return;
       }
 
@@ -73,50 +95,45 @@ export class RouteController {
         return;
       }
 
-      const binCoords = bins.map(bin => bin.location);
+      const binCoords = bins.map((bin) => bin.location);
       const optimizedPath = getOptimizedPath(startLocation, binCoords);
 
       const route = await Route.create({
         routeName,
-        assignedBins: bins.map(bin => bin._id),
+        assignedBins: bins.map((bin) => bin._id),
         optimizedPath,
         status: "Pending",
+        startLocation, 
       });
 
-      // TypeScript-safe: check start and waypoints
-      const start = startLocation;
-      const waypoints = optimizedPath ?? [];
-      const directionsUrl = generateDirectionsUrl(start, waypoints);
+      const directionsUrl = generateDirectionsUrl(startLocation, optimizedPath);
 
       res.status(201).json({ ...route.toObject(), directionsUrl });
-      return;
     } catch (err) {
       res.status(500).json({ message: (err as Error).message });
-      return;
     }
   }
 
-  // Get all routes
+  // ✅ Get all routes
   static async getAllRoutes(req: Request, res: Response): Promise<void> {
     try {
       const routes = await Route.find().populate("assignedBins");
-      const routesWithDirections = routes.map(route => {
-        const start = route.optimizedPath?.[0];
-        const waypoints = route.optimizedPath?.slice(1) ?? [];
-        const directionsUrl = start ? generateDirectionsUrl(start, waypoints) : "";
-
+      const routesWithDirections = routes.map((route) => {
+        const start = (route as any).startLocation || route.optimizedPath?.[0];
+        const directionsUrl =
+          start && route.optimizedPath
+            ? generateDirectionsUrl(start, route.optimizedPath)
+            : "";
         return { ...route.toObject(), directionsUrl };
       });
 
       res.json(routesWithDirections);
-      return;
     } catch (err) {
       res.status(500).json({ message: (err as Error).message });
-      return;
     }
   }
 
-  // Get route by ID
+  // ✅ Get route by ID
   static async getRouteById(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
@@ -127,27 +144,27 @@ export class RouteController {
         return;
       }
 
-      const start = route.optimizedPath?.[0];
-      const waypoints = route.optimizedPath?.slice(1) ?? [];
-      const directionsUrl = start ? generateDirectionsUrl(start, waypoints) : "";
+      const start = (route as any).startLocation || route.optimizedPath?.[0];
+      const directionsUrl =
+        start && route.optimizedPath
+          ? generateDirectionsUrl(start, route.optimizedPath)
+          : "";
 
       res.json({ ...route.toObject(), directionsUrl });
-      return;
     } catch (err) {
       res.status(500).json({ message: (err as Error).message });
-      return;
     }
   }
 
-  // Update route
+  // ✅ Update route (can also accept new mapUrl)
   static async updateRoute(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { routeName, assignedBins, status, startLocation } = req.body as {
+      const { routeName, assignedBins, status, mapUrl } = req.body as {
         routeName?: string;
         assignedBins?: string[];
         status?: "Pending" | "InProgress" | "Completed";
-        startLocation?: { latitude: number; longitude: number };
+        mapUrl?: string;
       };
 
       const route = await Route.findById(id);
@@ -158,36 +175,43 @@ export class RouteController {
 
       if (routeName) route.routeName = routeName;
       if (status) route.status = status;
-      if (assignedBins) route.assignedBins = assignedBins.map(id => new mongoose.Types.ObjectId(id));
+      if (assignedBins)
+        route.assignedBins = assignedBins.map(
+          (id) => new mongoose.Types.ObjectId(id)
+        );
 
-      if ((startLocation || assignedBins) && route.assignedBins.length > 0) {
-        const binsData = await Bin.find({ _id: { $in: route.assignedBins } });
-        const binCoords = binsData.map(bin => bin.location);
+      let startLocation = (route as any).startLocation;
 
-        const start = startLocation ?? binCoords[0];
-        if (!start) {
-          res.status(400).json({ message: "No starting location or bins available" });
+      if (mapUrl) {
+        const extracted = extractCoordinatesFromUrl(mapUrl);
+        if (!extracted) {
+          res.status(400).json({ message: "Invalid mapUrl" });
           return;
         }
+        startLocation = extracted;
+        (route as any).startLocation = startLocation;
+      }
 
-        route.optimizedPath = getOptimizedPath(start, binCoords);
+      if ((mapUrl || assignedBins) && route.assignedBins.length > 0) {
+        const binsData = await Bin.find({ _id: { $in: route.assignedBins } });
+        const binCoords = binsData.map((bin) => bin.location);
+        route.optimizedPath = getOptimizedPath(startLocation, binCoords);
       }
 
       await route.save();
 
-      const start = route.optimizedPath?.[0];
-      const waypoints = route.optimizedPath?.slice(1) ?? [];
-      const directionsUrl = start ? generateDirectionsUrl(start, waypoints) : "";
+      const directionsUrl = generateDirectionsUrl(
+        startLocation,
+        route.optimizedPath
+      );
 
       res.json({ ...route.toObject(), directionsUrl });
-      return;
     } catch (err) {
       res.status(500).json({ message: (err as Error).message });
-      return;
     }
   }
 
-  // Delete route
+  // ✅ Delete route
   static async deleteRoute(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
@@ -199,10 +223,8 @@ export class RouteController {
       }
 
       res.json({ message: "Route deleted successfully" });
-      return;
     } catch (err) {
       res.status(500).json({ message: (err as Error).message });
-      return;
     }
   }
 }

@@ -6,11 +6,16 @@ import connectDB from "./src/config/db.js";
 import binRoutes from "./src/routes/binRoute";
 import authRoutes from "./src/routes/authRoutes.js";
 import requestRoutes from "./src/routes/requestRoutes.js";
+import wasteRecordRoutes from "./src/routes/wasteRecordRoutes.js";
 import routeRoutes from "./src/routes/routeRoutes.js";
 import collectorRoutes from "./src/routes/collectorRoutes.js";
-import paymentRoutes from "./src/routes/paymentRoutes.js";
+import paymentBillRoutes from "./src/routes/paymentBillRoutes.js";
 import truckRoutes from "./src/routes/truckRoutes.js";
-import userRoutes from "./src/routes/userRoutes.js";
+import userRoutes, { residentNotificationsRouter } from "./src/routes/userRoutes.js";
+import rewardRoutes from "./src/routes/rewardRoutes.js";
+
+import paymentGateway from "./src/routes/paymentGatewayRoute";
+import webhookRoute from "./src/routes/webhookRoute";
 
 dotenv.config();
 
@@ -33,12 +38,18 @@ app.get("/", (req: Request, res: Response) =>
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/requests", requestRoutes);
+app.use("/api/waste-records", wasteRecordRoutes);
 app.use("/api/routes", routeRoutes);
 app.use("/api/collector", collectorRoutes);
-app.use("/api/payments", paymentRoutes);
+app.use("/api/payment-bills", paymentBillRoutes);
 app.use("/api/bins", binRoutes);
 app.use("/api/trucks", truckRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/my/notifications", residentNotificationsRouter);
+app.use("/api/rewards", rewardRoutes);
+
+app.use("/api/payment", paymentGateway);
+app.use("/api/webhook", webhookRoute);
 
 // 404 handler
 app.use((req: Request, res: Response) => 

@@ -1,5 +1,5 @@
 import { Model, Types } from "mongoose";
-import { PaymentBill, PaymentBillDocument } from "../models/Payment";
+import { PaymentBill, PaymentBillDocument } from "../models/PaymentBill";
 
 // Define an interface for repository operations (helps with SOLID - Liskov & Interface Segregation)
 export interface IPaymentBillRepository {
