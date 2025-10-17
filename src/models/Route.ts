@@ -4,6 +4,7 @@ export interface IRoute extends Document {
   routeName?: string;
   assignedBins: mongoose.Types.ObjectId[];
   optimizedPath: { latitude: number; longitude: number }[];
+  startLocation?: { latitude: number; longitude: number };
   status: "Pending" | "InProgress" | "Completed";
 }
 
@@ -19,6 +20,10 @@ const routeSchema = new Schema<IRoute>(
         longitude: { type: Number, required: true }
       }
     ],
+    startLocation: { 
+      latitude: { type: Number },
+      longitude: { type: Number }
+    },
     status: {
       type: String,
       enum: ["Pending", "InProgress", "Completed"],
