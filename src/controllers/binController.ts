@@ -135,3 +135,39 @@ export const deleteBin = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ message: (error as Error).message });
   }
 };
+
+export const collectBin = async (req: Request, res: Response): Promise<void> => {
+  console.log("collect")
+  try {
+    const { id } = req.params;
+
+    const updatedBin = await Bin.findByIdAndUpdate(id, {status : "Collected",  fillLevel : 0}, { new: true });
+
+    if (!updatedBin) {
+      res.status(404).json({ message: "Bin not found" });
+      return;
+    }
+
+    res.json(updatedBin);
+  } catch (error) {
+    res.status(500).json({ message: (error as Error).message });
+  }
+};
+
+export const cancelBin = async (req: Request, res: Response): Promise<void> => {
+  console.log("cancel")
+  try {
+    const { id } = req.params;
+
+    const updatedBin = await Bin.findByIdAndUpdate(id, {status : "Canceled"}, { new: true });
+
+    if (!updatedBin) {
+      res.status(404).json({ message: "Bin not found" });
+      return;
+    }
+
+    res.json(updatedBin);
+  } catch (error) {
+    res.status(500).json({ message: (error as Error).message });
+  }
+};
