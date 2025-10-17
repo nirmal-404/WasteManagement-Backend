@@ -12,6 +12,9 @@ import paymentRoutes from "./src/routes/paymentRoutes.js";
 import truckRoutes from "./src/routes/truckRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
 
+import paymentGateway from "./src/routes/paymentGatewayRoute";
+import webhookRoute from "./src/routes/webhookRoute";
+
 dotenv.config();
 
 const app = express();
@@ -39,6 +42,9 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/bins", binRoutes);
 app.use("/api/trucks", truckRoutes);
 app.use("/api/users", userRoutes);
+
+app.use("/api/payment", paymentGateway);
+app.use("/api/webhook", webhookRoute);
 
 // 404 handler
 app.use((req: Request, res: Response) => 

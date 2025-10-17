@@ -3,7 +3,6 @@ import Route from "../models/Route";
 import Bin from "../models/Bin";
 import mongoose from "mongoose";
 
-/* ------------------------------ Helper Utils ------------------------------ */
 
 // Calculate approximate distance between two coordinates
 const distance = (
@@ -69,7 +68,6 @@ function generateDirectionsUrl(
   return `https://www.google.com/maps/dir/${coordinates}`;
 }
 
-/* ------------------------------ Controller ------------------------------ */
 
 export class RouteController {
   // ✅ Create route using mapUrl
@@ -105,7 +103,7 @@ export class RouteController {
         assignedBins: bins.map((bin) => bin._id),
         optimizedPath,
         status: "Pending",
-        startLocation, // now stored automatically
+        startLocation, 
       });
 
       const directionsUrl = generateDirectionsUrl(startLocation, optimizedPath);
