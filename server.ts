@@ -14,6 +14,9 @@ import truckRoutes from "./src/routes/truckRoutes.js";
 import userRoutes, { residentNotificationsRouter } from "./src/routes/userRoutes.js";
 import rewardRoutes from "./src/routes/rewardRoutes.js";
 
+import paymentGateway from "./src/routes/paymentGatewayRoute";
+import webhookRoute from "./src/routes/webhookRoute";
+
 dotenv.config();
 
 const app = express();
@@ -44,6 +47,9 @@ app.use("/api/trucks", truckRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/my/notifications", residentNotificationsRouter);
 app.use("/api/rewards", rewardRoutes);
+
+app.use("/api/payment", paymentGateway);
+app.use("/api/webhook", webhookRoute);
 
 // 404 handler
 app.use((req: Request, res: Response) => 
