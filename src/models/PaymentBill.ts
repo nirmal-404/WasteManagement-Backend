@@ -30,7 +30,7 @@ const PaymentBillSchema = new Schema<PaymentBillDocument>(
   { timestamps: true }
 );
 
-// Create the model
+//used factory pattern  - this act as factory to create model instance
 export const PaymentBillModel: Model<PaymentBillDocument> = model<PaymentBillDocument>(
   "PaymentBill",
   PaymentBillSchema
